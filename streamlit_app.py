@@ -65,10 +65,11 @@ st.markdown(
         display: none;
     }
     .app-title {
-        font-size: 2rem;
+        font-size: 1.9rem;
         font-weight: 760;
-        line-height: 1.15;
+        line-height: 1.35;
         margin: 0 0 0.2rem 0;
+        padding-top: 0.1rem;
         color: #111827;
     }
     .app-subtitle {
