@@ -21,6 +21,7 @@ from mc_options.monte_carlo import (
     price_european_option_mc,
     price_european_option_mc_antithetic,
     price_european_option_mc_control_variate,
+    price_european_option_mc_sobol,
 )
 from mc_options.plotting import (
     plot_asian_greeks_comparison,
@@ -35,24 +36,29 @@ from mc_options.plotting import (
 
 def _pricing_example_table() -> pd.DataFrame:
     rows = []
+    methods = {
+        "plain": price_european_option_mc,
+        "sobol_quasi_mc": price_european_option_mc_sobol,
+    }
     for option_type in ["call", "put"]:
-        mc_result = price_european_option_mc(
-            100.0, 100.0, 0.05, 0.20, 1.0, 100_000, option_type, 42
-        )
         bs_price = black_scholes_price(100.0, 100.0, 0.05, 0.20, 1.0, option_type)
-        rows.append(
-            {
-                "option_type": option_type,
-                "method": "plain",
-                "mc_price": mc_result["mc_price"],
-                "black_scholes_price": bs_price,
-                "standard_error": mc_result["standard_error"],
-                "ci_lower": mc_result["ci_lower"],
-                "ci_upper": mc_result["ci_upper"],
-                "absolute_error": abs(mc_result["mc_price"] - bs_price),
-                "relative_error_pct": abs(mc_result["mc_price"] - bs_price) / bs_price * 100,
-            }
-        )
+        for method_name, method_func in methods.items():
+            mc_result = method_func(
+                100.0, 100.0, 0.05, 0.20, 1.0, 100_000, option_type, 42
+            )
+            rows.append(
+                {
+                    "option_type": option_type,
+                    "method": method_name,
+                    "mc_price": mc_result["mc_price"],
+                    "black_scholes_price": bs_price,
+                    "standard_error": mc_result["standard_error"],
+                    "ci_lower": mc_result["ci_lower"],
+                    "ci_upper": mc_result["ci_upper"],
+                    "absolute_error": abs(mc_result["mc_price"] - bs_price),
+                    "relative_error_pct": abs(mc_result["mc_price"] - bs_price) / bs_price * 100,
+                }
+            )
     return pd.DataFrame(rows)
 
 
@@ -163,7 +169,8 @@ def main() -> None:
         "Variance reduction sample prices: "
         f"plain={price_european_option_mc(100, 100, 0.05, 0.2, 1, 100_000, 'call', 42)['mc_price']:.4f}, "
         f"antithetic={price_european_option_mc_antithetic(100, 100, 0.05, 0.2, 1, 100_000, 'call', 42)['mc_price']:.4f}, "
-        f"control={price_european_option_mc_control_variate(100, 100, 0.05, 0.2, 1, 100_000, 'call', 42)['mc_price']:.4f}"
+        f"control={price_european_option_mc_control_variate(100, 100, 0.05, 0.2, 1, 100_000, 'call', 42)['mc_price']:.4f}, "
+        f"sobol={price_european_option_mc_sobol(100, 100, 0.05, 0.2, 1, 100_000, 'call', 42)['mc_price']:.4f}"
     )
 
 

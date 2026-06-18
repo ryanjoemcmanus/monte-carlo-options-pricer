@@ -1,4 +1,4 @@
-"""Monte Carlo and Black-Scholes tools for European option pricing."""
+"""Monte Carlo, Sobol, and Black-Scholes tools for option pricing."""
 
 from mc_options.asian_options import (
     estimate_asian_greeks_mc_finite_difference,
@@ -20,6 +20,8 @@ from mc_options.monte_carlo import (
     price_european_option_mc,
     price_european_option_mc_antithetic,
     price_european_option_mc_control_variate,
+    price_european_option_mc_sobol,
+    simulate_terminal_prices_sobol,
     simulate_terminal_prices,
 )
 
@@ -36,9 +38,11 @@ __all__ = [
     "price_european_option_mc",
     "price_european_option_mc_antithetic",
     "price_european_option_mc_control_variate",
+    "price_european_option_mc_sobol",
     "realized_volatility",
     "realized_volatility_summary",
     "simulate_gbm_paths",
     "simulate_terminal_prices",
+    "simulate_terminal_prices_sobol",
     "years_to_expiration",
 ]

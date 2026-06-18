@@ -31,6 +31,7 @@ from mc_options.monte_carlo import (
     price_european_option_mc,
     price_european_option_mc_antithetic,
     price_european_option_mc_control_variate,
+    price_european_option_mc_sobol,
 )
 
 
@@ -156,6 +157,8 @@ def _price_european_cached(
         return price_european_option_mc_antithetic(
             S0, K, r, sigma, T, even_paths, option_type, seed
         )
+    if method == "Sobol Quasi-Monte Carlo":
+        return price_european_option_mc_sobol(S0, K, r, sigma, T, n_paths, option_type, seed)
     return price_european_option_mc_control_variate(S0, K, r, sigma, T, n_paths, option_type, seed)
 
 
@@ -528,7 +531,7 @@ with st.sidebar:
     if product == "European Vanilla":
         method = st.selectbox(
             "Pricing method",
-            ["Plain Monte Carlo", "Antithetic Variates", "Control Variate"],
+            ["Plain Monte Carlo", "Antithetic Variates", "Control Variate", "Sobol Quasi-Monte Carlo"],
             index=2,
         )
     else:
@@ -578,7 +581,7 @@ absolute_error = abs(result["mc_price"] - benchmark)
 relative_error = _relative_error(result["mc_price"], benchmark)
 
 metric_cols = st.columns(5)
-metric_cols[0].metric("Monte Carlo price", _format_money(result["mc_price"]))
+metric_cols[0].metric("Model price", _format_money(result["mc_price"]))
 metric_cols[1].metric(benchmark_label, _format_money(benchmark))
 metric_cols[2].metric("Standard error", _format_number(result["standard_error"]))
 metric_cols[3].metric("Absolute error", _format_number(absolute_error))
@@ -625,7 +628,7 @@ with tab_summary:
     with right:
         st.markdown('<div class="section-label">Estimator Details</div>', unsafe_allow_html=True)
         detail_rows = [
-            ["MC price", result["mc_price"]],
+            ["Model price", result["mc_price"]],
             [benchmark_label, benchmark],
             ["Standard error", result["standard_error"]],
             ["CI lower", result["ci_lower"]],
@@ -635,6 +638,9 @@ with tab_summary:
             detail_rows.append(["Control beta", result["beta"]])
         if "correlation" in result:
             detail_rows.append(["Payoff correlation", result["correlation"]])
+        if "sobol_generated_paths" in result:
+            detail_rows.append(["Sobol generated paths", result["sobol_generated_paths"]])
+            detail_rows.append(["Sobol scrambling", result["scramble"]])
         detail_df = pd.DataFrame(detail_rows, columns=["Metric", "Value"])
         detail_df["Value"] = detail_df["Value"].astype(str)
         st.dataframe(detail_df, hide_index=True, width="stretch")
@@ -676,6 +682,11 @@ with tab_methods:
             methods_df.set_index("method")[["mean_standard_error"]],
             "European Method Efficiency",
             "Mean standard error",
+        )
+        _plot_bar(
+            methods_df.set_index("method")[["absolute_error"]],
+            "European Pricing Error",
+            "Absolute error vs. Black-Scholes",
         )
     else:
         methods_df = _asian_methods_cached(

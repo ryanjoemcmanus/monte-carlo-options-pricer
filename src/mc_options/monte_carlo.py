@@ -7,6 +7,7 @@ from typing import Any
 
 import numpy as np
 from numpy.typing import NDArray
+from scipy.stats import norm, qmc
 
 from mc_options.utils import (
     european_payoff,
@@ -36,6 +37,27 @@ def simulate_terminal_prices(
     validate_n_paths(n_paths)
     rng = np.random.default_rng(seed)
     z = rng.standard_normal(n_paths)
+    return _terminal_prices_from_z(S0, r, sigma, T, z)
+
+
+def simulate_terminal_prices_sobol(
+    S0: float,
+    r: float,
+    sigma: float,
+    T: float,
+    n_paths: int,
+    seed: int | None = None,
+    scramble: bool = True,
+) -> NDArray[np.float64]:
+    """Simulate terminal GBM prices from Sobol quasi-random normal draws."""
+    validate_option_inputs(S0, 1.0, r, sigma, T)
+    validate_n_paths(n_paths)
+
+    sampler = qmc.Sobol(d=1, scramble=scramble, seed=seed)
+    m = math.ceil(math.log2(n_paths))
+    uniforms = sampler.random_base2(m=m)[:n_paths, 0]
+    uniforms = np.clip(uniforms, np.finfo(float).tiny, 1.0 - np.finfo(float).eps)
+    z = norm.ppf(uniforms)
     return _terminal_prices_from_z(S0, r, sigma, T, z)
 
 
@@ -165,6 +187,45 @@ def price_european_option_mc_control_variate(
         n_paths,
         "control_variate",
         {"beta": beta},
+    )
+
+
+def price_european_option_mc_sobol(
+    S0: float,
+    K: float,
+    r: float,
+    sigma: float,
+    T: float,
+    n_paths: int = 100_000,
+    option_type: str = "call",
+    seed: int | None = None,
+    scramble: bool = True,
+) -> dict[str, Any]:
+    """Price a European option with scrambled Sobol quasi-Monte Carlo."""
+    option_type = validate_option_type(option_type)
+    validate_option_inputs(S0, K, r, sigma, T)
+    validate_n_paths(n_paths)
+
+    terminal_prices = simulate_terminal_prices_sobol(
+        S0, r, sigma, T, n_paths, seed=seed, scramble=scramble
+    )
+    discounted_payoffs = math.exp(-r * T) * european_payoff(terminal_prices, K, option_type)
+    generated_paths = 2 ** math.ceil(math.log2(n_paths))
+    return _summary_from_discounted_payoffs(
+        discounted_payoffs,
+        option_type,
+        S0,
+        K,
+        r,
+        sigma,
+        T,
+        n_paths,
+        "sobol_quasi_mc",
+        {
+            "scramble": scramble,
+            "sobol_dimension": 1,
+            "sobol_generated_paths": generated_paths,
+        },
     )
 
 

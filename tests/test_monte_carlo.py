@@ -9,13 +9,22 @@ from mc_options.monte_carlo import (
     price_european_option_mc,
     price_european_option_mc_antithetic,
     price_european_option_mc_control_variate,
+    price_european_option_mc_sobol,
     simulate_terminal_prices,
+    simulate_terminal_prices_sobol,
 )
 
 
 def test_terminal_price_shape_and_seed_reproducibility() -> None:
     first = simulate_terminal_prices(100, 0.05, 0.20, 1.0, 10_000, seed=7)
     second = simulate_terminal_prices(100, 0.05, 0.20, 1.0, 10_000, seed=7)
+    assert len(first) == 10_000
+    np.testing.assert_allclose(first, second)
+
+
+def test_sobol_terminal_prices_are_reproducible() -> None:
+    first = simulate_terminal_prices_sobol(100, 0.05, 0.20, 1.0, 10_000, seed=7)
+    second = simulate_terminal_prices_sobol(100, 0.05, 0.20, 1.0, 10_000, seed=7)
     assert len(first) == 10_000
     np.testing.assert_allclose(first, second)
 
@@ -50,6 +59,17 @@ def test_control_variate_returns_beta_and_close_price() -> None:
     assert "beta" in result
     assert result["standard_error"] >= 0
     assert result["mc_price"] == pytest.approx(bs_price, abs=0.08)
+
+
+def test_sobol_quasi_mc_returns_close_price() -> None:
+    result = price_european_option_mc_sobol(
+        100, 100, 0.05, 0.20, 1.0, 4_096, "call", seed=42
+    )
+    bs_price = black_scholes_price(100, 100, 0.05, 0.20, 1.0, "call")
+    assert result["method"] == "sobol_quasi_mc"
+    assert result["sobol_dimension"] == 1
+    assert result["sobol_generated_paths"] == 4_096
+    assert result["mc_price"] == pytest.approx(bs_price, abs=0.02)
 
 
 def test_finite_difference_greeks_keys_and_delta_accuracy() -> None:

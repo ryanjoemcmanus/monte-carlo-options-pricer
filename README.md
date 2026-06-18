@@ -1,14 +1,16 @@
 # Monte Carlo Options Pricer
 
-A Python derivatives-analytics platform for Monte Carlo option pricing, Black-Scholes validation, variance reduction, Greeks estimation, implied-volatility analysis, and interactive listed-option exploration.
+A Python derivatives-analytics platform for Monte Carlo and Sobol quasi-Monte Carlo option pricing, Black-Scholes validation, variance reduction, Greeks estimation, implied-volatility analysis, and interactive listed-option exploration.
 
 All numerical results below are reproducible from fixed-seed scripts in this repository. The market-data dashboard uses Yahoo Finance through `yfinance` for delayed demonstration data and is not production trading software.
 
 ## Highlights
 
-- Prices European calls and puts using plain Monte Carlo, antithetic variates, and control variates.
+- Prices European calls and puts using plain Monte Carlo, antithetic variates, control variates, and scrambled Sobol quasi-Monte Carlo.
 - Prices fixed-strike arithmetic Asian options using full-path geometric Brownian motion simulation.
 - Validates European option estimates against Black-Scholes closed-form prices and confidence intervals.
+- Reduced the fixed-seed European call pricing error from `0.0300` with plain Monte Carlo to `0.00003` with Sobol quasi-Monte Carlo at `100,000` paths.
+- Reduced 20-trial European call pricing error to `0.000024` with Sobol quasi-Monte Carlo, compared with `0.00245` for plain Monte Carlo and `0.000565` for the control variate.
 - Reduced European call standard error from `0.0466` to `0.0177` using a terminal-stock-price control variate.
 - Reduced arithmetic Asian option standard error from approximately `0.0254` to approximately `0.0007` using a geometric Asian control variate.
 - Estimates Delta, Gamma, Vega, Theta, and Rho with finite differences and common random numbers.
@@ -33,36 +35,34 @@ For a one-year at-the-money European call with:
 - `100,000` simulated paths
 - `seed = 42`
 
-| Method | Price |
-|---|---:|
-| Plain Monte Carlo | `10.4205` |
-| Black-Scholes | `10.4506` |
-| Absolute error | `0.0300` |
-| Relative difference | `0.2875%` |
-| Monte Carlo standard error | `0.0468` |
-| 95% confidence interval | `[10.3289, 10.5122]` |
+| Method | Price | Absolute Error | Relative Difference |
+|---|---:|---:|---:|
+| Plain Monte Carlo | `10.4205` | `0.0300` | `0.2875%` |
+| Sobol quasi-Monte Carlo | `10.4506` | `0.00003` | `0.0003%` |
+| Black-Scholes | `10.4506` | `0.0000` | `0.0000%` |
 
-The Black-Scholes benchmark falls inside the Monte Carlo 95% confidence interval.
+The Black-Scholes benchmark falls inside the plain Monte Carlo 95% confidence interval `[10.3289, 10.5122]`.
 
-## Variance Reduction
+## Variance Reduction and Quasi-Monte Carlo
 
-| Experiment | Plain MC Std. Error | Improved Std. Error | Reduction Method |
+| Experiment | Baseline | Improved Result | Method |
 |---|---:|---:|---|
-| European call | `0.0466` | `0.0177` | Terminal stock-price control variate |
-| European call | `0.0466` | `0.0328` | Antithetic variates |
-| Arithmetic Asian call | `0.0254` | `0.0007` | Geometric Asian control variate |
+| European call standard error | `0.0466` | `0.0177` | Terminal stock-price control variate |
+| European call standard error | `0.0466` | `0.0328` | Antithetic variates |
+| European call absolute pricing error | `0.00245` | `0.000024` | Sobol quasi-Monte Carlo |
+| Arithmetic Asian call standard error | `0.0254` | `0.0007` | Geometric Asian control variate |
 
 The arithmetic Asian result uses the geometric Asian payoff as a highly correlated control variate while preserving the arithmetic Asian option as the pricing target. In the fixed-seed single-run example, payoff correlation was `0.9996` and control beta was `1.0358`.
 
 ## Overview
 
-This project is a compact derivatives analytics workflow. It starts with risk-neutral simulation under geometric Brownian motion, validates European option prices against Black-Scholes, adds variance reduction, estimates Greeks, prices path-dependent arithmetic Asian options, and connects the analytics to a Streamlit dashboard for listed-option exploration.
+This project is a compact derivatives analytics workflow. It starts with risk-neutral simulation under geometric Brownian motion, validates European option prices against Black-Scholes, adds variance reduction and Sobol quasi-Monte Carlo, estimates Greeks, prices path-dependent arithmetic Asian options, and connects the analytics to a Streamlit dashboard for listed-option exploration.
 
 The core research lesson is that Monte Carlo pricing is not just about producing a point estimate. A useful pricing engine should quantify uncertainty, validate against known benchmarks, reduce estimator variance when possible, and expose model assumptions clearly.
 
 ## Dashboard Modes
 
-`Model Lab` prices European vanilla and arithmetic Asian options interactively. Users can change spot, strike, volatility, interest rate, maturity, option type, simulation count, random seed, and pricing method. The dashboard reports Monte Carlo price, benchmark price, standard error, confidence interval, relative error, Greeks, and method comparisons.
+`Model Lab` prices European vanilla and arithmetic Asian options interactively. Users can change spot, strike, volatility, interest rate, maturity, option type, simulation count, random seed, and pricing method. European methods include plain Monte Carlo, antithetic variates, a terminal-stock-price control variate, and scrambled Sobol quasi-Monte Carlo. The dashboard reports price, benchmark price, standard error, confidence interval, relative error, Greeks, and method comparisons.
 
 `Market Option Chain` fetches listed-option chains with `yfinance`, computes bid/ask midpoints, solves Black-Scholes implied volatility, compares market midpoint against a flat-volatility Black-Scholes model, plots the implied-volatility smile, and compares selected-contract implied volatility with 20-day, 60-day, and 252-day realized historical volatility.
 
@@ -77,6 +77,8 @@ S_T = S_0 \exp\left[\left(r-\frac{1}{2}\sigma^2\right)T
 +\sigma\sqrt{T}Z\right],
 \qquad Z\sim\mathcal{N}(0,1).
 $$
+
+The Sobol quasi-Monte Carlo engine replaces pseudo-random normal draws with one-dimensional scrambled Sobol points transformed through the inverse normal CDF. Repeated Sobol trials use different scrambles, which makes pricing-error comparisons reproducible while preserving the low-discrepancy structure.
 
 European call and put payoffs are:
 
@@ -104,7 +106,7 @@ Arithmetic Asian options do not have the same simple closed-form benchmark as Eu
 
 ## Implementation
 
-The code is organized as an installable package under `src/mc_options`. Core modules separate Black-Scholes formulas, Monte Carlo pricing, Asian option simulation, implied-volatility inversion, market-data enrichment, experiment generation, plotting, and validation helpers.
+The code is organized as an installable package under `src/mc_options`. Core modules separate Black-Scholes formulas, Monte Carlo and Sobol pricing, Asian option simulation, implied-volatility inversion, market-data enrichment, experiment generation, plotting, and validation helpers.
 
 Monte Carlo Greeks use central finite differences with common random numbers. This keeps the random shocks aligned across bumped scenarios and reduces finite-difference noise.
 
@@ -112,15 +114,15 @@ Monte Carlo Greeks use central finite differences with common random numbers. Th
 
 ### Monte Carlo Convergence
 
-The convergence experiment compares mean Monte Carlo call prices against the Black-Scholes benchmark across path counts from `1,000` to `500,000`, with 10 trials per path count.
+The convergence experiment compares mean plain Monte Carlo and scrambled Sobol quasi-Monte Carlo call prices against the Black-Scholes benchmark across path counts from `1,000` to `500,000`, with 10 trials per path count.
 
 ![Monte Carlo convergence](outputs/figures/convergence_price.png)
 
-At `100,000` paths, the 10-trial mean price was `10.4468` versus the Black-Scholes price of `10.4506`, a relative error of `0.0363%`.
+At `100,000` paths, the 10-trial plain Monte Carlo mean price was `10.4468`, a relative error of `0.0363%`. The Sobol mean price was `10.4505`, reducing relative error to `0.0004%`. At `500,000` paths, Sobol relative error was `0.0001%`.
 
-### European Variance Reduction
+### European Variance Reduction and Sobol QMC
 
-The European variance-reduction experiment compares plain Monte Carlo, antithetic variates, and a terminal-stock-price control variate over 20 trials.
+The European method comparison evaluates plain Monte Carlo, antithetic variates, a terminal-stock-price control variate, and scrambled Sobol quasi-Monte Carlo over 20 trials.
 
 ![European variance-reduction comparison](outputs/figures/variance_reduction_comparison.png)
 
@@ -129,6 +131,9 @@ The European variance-reduction experiment compares plain Monte Carlo, antitheti
 | Plain Monte Carlo | `10.4481` | `0.0466` | `0.0025` |
 | Antithetic variates | `10.4450` | `0.0328` | `0.0056` |
 | Control variate | `10.4511` | `0.0177` | `0.0006` |
+| Sobol quasi-Monte Carlo | `10.4506` | `0.0465` | `0.000024` |
+
+For Sobol quasi-Monte Carlo, the payoff-sample standard error is shown for comparability, but the stronger diagnostic is pricing error across independent scrambles. The 20-trial Sobol price standard deviation was `0.000239`, compared with `0.0525` for plain Monte Carlo.
 
 ### Asian Option Variance Reduction
 
@@ -195,12 +200,12 @@ Run the full test suite:
 pytest
 ```
 
-The suite currently contains 31 tests. It covers fixed-seed Monte Carlo reproducibility, Black-Scholes prices and Greeks, invalid input handling, put-call parity, confidence-interval behavior, antithetic variates, control variates, finite-difference Greeks, Asian path simulation, geometric Asian pricing, Asian control-variate variance reduction, Asian Greeks, implied-volatility inversion, option-chain enrichment, and historical-volatility calculations.
+The suite currently contains 33 tests. It covers fixed-seed Monte Carlo reproducibility, Sobol terminal-price reproducibility, Black-Scholes prices and Greeks, invalid input handling, put-call parity, confidence-interval behavior, antithetic variates, control variates, Sobol quasi-Monte Carlo pricing, finite-difference Greeks, Asian path simulation, geometric Asian pricing, Asian control-variate variance reduction, Asian Greeks, implied-volatility inversion, option-chain enrichment, and historical-volatility calculations.
 
 Latest local verification:
 
 ```text
-31 passed
+33 passed
 ```
 
 ## Repository Structure
@@ -237,4 +242,4 @@ The dashboard and scripts are intended for derivatives analytics, numerical-meth
 
 ## Future Work
 
-Natural extensions include barrier options, quasi-Monte Carlo sampling, implied-volatility term-structure views, Heston stochastic-volatility pricing, dividend-yield support, calibration to option-chain data, local-volatility surfaces, and more robust institutional market-data integrations.
+Natural extensions include barrier options, Brownian-bridge Sobol paths for high-dimensional path-dependent products, implied-volatility term-structure views, Heston stochastic-volatility pricing, dividend-yield support, calibration to option-chain data, local-volatility surfaces, and more robust institutional market-data integrations.

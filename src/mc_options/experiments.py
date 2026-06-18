@@ -17,6 +17,7 @@ from mc_options.monte_carlo import (
     price_european_option_mc,
     price_european_option_mc_antithetic,
     price_european_option_mc_control_variate,
+    price_european_option_mc_sobol,
 )
 from mc_options.utils import validate_option_type
 
@@ -38,7 +39,7 @@ def run_convergence_experiment(
     n_trials: int = 10,
     seed: int = 42,
 ) -> pd.DataFrame:
-    """Compare Monte Carlo estimates to Black-Scholes as path counts increase."""
+    """Compare Monte Carlo and Sobol estimates to Black-Scholes as paths increase."""
     option_type = validate_option_type(option_type)
     bs_price = black_scholes_price(S0, K, r, sigma, T, option_type)
     rows = []
@@ -50,15 +51,26 @@ def run_convergence_experiment(
             ]
             for i in range(n_trials)
         ]
+        sobol_prices = [
+            price_european_option_mc_sobol(S0, K, r, sigma, T, n_paths, option_type, seed + i)[
+                "mc_price"
+            ]
+            for i in range(n_trials)
+        ]
         mean_price = float(np.mean(trial_prices))
+        mean_sobol_price = float(np.mean(sobol_prices))
         rows.append(
             {
                 "n_paths": n_paths,
                 "mean_mc_price": mean_price,
                 "std_mc_price": float(np.std(trial_prices, ddof=1)),
+                "mean_sobol_price": mean_sobol_price,
+                "std_sobol_price": float(np.std(sobol_prices, ddof=1)),
                 "black_scholes_price": bs_price,
                 "absolute_error": abs(mean_price - bs_price),
                 "relative_error_pct": _relative_error_pct(mean_price, bs_price),
+                "sobol_absolute_error": abs(mean_sobol_price - bs_price),
+                "sobol_relative_error_pct": _relative_error_pct(mean_sobol_price, bs_price),
             }
         )
 
@@ -109,13 +121,14 @@ def run_variance_reduction_experiment(
     n_trials: int = 20,
     seed: int = 42,
 ) -> pd.DataFrame:
-    """Compare plain MC, antithetic variates, and control variates."""
+    """Compare plain MC, antithetic variates, control variates, and Sobol QMC."""
     option_type = validate_option_type(option_type)
     bs_price = black_scholes_price(S0, K, r, sigma, T, option_type)
     methods = {
         "plain": price_european_option_mc,
         "antithetic": price_european_option_mc_antithetic,
         "control_variate": price_european_option_mc_control_variate,
+        "sobol_quasi_mc": price_european_option_mc_sobol,
     }
     rows = []
 

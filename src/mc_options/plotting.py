@@ -18,7 +18,14 @@ def _save_if_requested(fig: plt.Figure, output_path: str | Path | None) -> None:
 def plot_convergence(results_df: pd.DataFrame, output_path: str | Path | None = None) -> plt.Figure:
     """Plot Monte Carlo mean price against the Black-Scholes benchmark."""
     fig, ax = plt.subplots(figsize=(8, 5))
-    ax.plot(results_df["n_paths"], results_df["mean_mc_price"], marker="o", label="Monte Carlo")
+    ax.plot(results_df["n_paths"], results_df["mean_mc_price"], marker="o", label="Plain Monte Carlo")
+    if "mean_sobol_price" in results_df:
+        ax.plot(
+            results_df["n_paths"],
+            results_df["mean_sobol_price"],
+            marker="s",
+            label="Sobol quasi-Monte Carlo",
+        )
     ax.axhline(
         results_df["black_scholes_price"].iloc[0],
         color="black",
@@ -38,12 +45,27 @@ def plot_convergence(results_df: pd.DataFrame, output_path: str | Path | None = 
 def plot_error_vs_paths(results_df: pd.DataFrame, output_path: str | Path | None = None) -> plt.Figure:
     """Plot absolute pricing error against path count."""
     fig, ax = plt.subplots(figsize=(8, 5))
-    ax.plot(results_df["n_paths"], results_df["absolute_error"], marker="o", color="tab:red")
+    ax.plot(
+        results_df["n_paths"],
+        results_df["absolute_error"],
+        marker="o",
+        color="tab:red",
+        label="Plain Monte Carlo",
+    )
+    if "sobol_absolute_error" in results_df:
+        ax.plot(
+            results_df["n_paths"],
+            results_df["sobol_absolute_error"],
+            marker="s",
+            color="tab:blue",
+            label="Sobol quasi-Monte Carlo",
+        )
     ax.set_xscale("log")
     ax.set_xlabel("Number of paths")
     ax.set_ylabel("Absolute error")
     ax.set_title("Pricing Error vs. Monte Carlo Paths")
     ax.grid(True, alpha=0.3)
+    ax.legend()
     _save_if_requested(fig, output_path)
     return fig
 
@@ -73,13 +95,31 @@ def plot_moneyness_comparison(
 def plot_variance_reduction_comparison(
     results_df: pd.DataFrame, output_path: str | Path | None = None
 ) -> plt.Figure:
-    """Create a bar chart comparing standard errors by Monte Carlo method."""
-    fig, ax = plt.subplots(figsize=(8, 5))
-    ax.bar(results_df["method"], results_df["mean_standard_error"], color=["#4C78A8", "#F58518", "#54A24B"])
-    ax.set_xlabel("Method")
-    ax.set_ylabel("Mean standard error")
-    ax.set_title("Variance Reduction Comparison")
-    ax.grid(True, axis="y", alpha=0.3)
+    """Create bar charts comparing standard errors and pricing errors by method."""
+    fig, axes = plt.subplots(1, 2, figsize=(12, 5))
+    colors = ["#4C78A8", "#F58518", "#54A24B", "#B279A2", "#E45756"]
+    axes[0].bar(
+        results_df["method"],
+        results_df["mean_standard_error"],
+        color=colors[: len(results_df)],
+    )
+    axes[0].set_xlabel("Method")
+    axes[0].set_ylabel("Mean standard error")
+    axes[0].set_title("Estimator Standard Error")
+    axes[0].grid(True, axis="y", alpha=0.3)
+    axes[0].tick_params(axis="x", labelrotation=15)
+
+    axes[1].bar(
+        results_df["method"],
+        results_df["absolute_error"],
+        color=colors[: len(results_df)],
+    )
+    axes[1].set_xlabel("Method")
+    axes[1].set_ylabel("Absolute error")
+    axes[1].set_title("Error vs. Black-Scholes")
+    axes[1].grid(True, axis="y", alpha=0.3)
+    axes[1].tick_params(axis="x", labelrotation=15)
+    fig.tight_layout()
     _save_if_requested(fig, output_path)
     return fig
 
