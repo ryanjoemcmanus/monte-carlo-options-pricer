@@ -1,8 +1,16 @@
 # Monte Carlo Options Pricer
 
+![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)
+![Tests](https://img.shields.io/badge/tests-33%20passed-2ea44f)
+![Project type](https://img.shields.io/badge/project%20type-quantitative%20finance-6f42c1)
+
 A Python derivatives-analytics platform for Monte Carlo and Sobol quasi-Monte Carlo option pricing, Black-Scholes validation, variance reduction, Greeks estimation, implied-volatility analysis, and interactive listed-option exploration.
 
 All numerical results below are reproducible from fixed-seed scripts in this repository. The market-data dashboard uses Yahoo Finance through `yfinance` for delayed demonstration data and is not production trading software.
+
+## Why this matters for quant research
+
+This project demonstrates stochastic simulation for derivatives pricing, variance reduction, and benchmark validation against Black-Scholes. It also emphasizes model-error analysis and reproducible numerical research through fixed seeds, confidence intervals, and controlled experiments.
 
 ## Highlights
 
